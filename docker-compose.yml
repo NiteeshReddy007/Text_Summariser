@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: streamlit_summarizer_app
+    ports:
+      - "8501:8501" # Map host port 8501 to container port 8501 (Streamlit)
+    environment:
+      - OLLAMA_HOST=http://ollama:11434 # Points to the ollama service
+    depends_on:
+      - ollama
+    volumes:
+      - .:/app # Mount current directory to /app in container for live code updates (optional, good for dev)
+    networks:
+      - ollama_net
+
+  ollama:
+    image: ollama/ollama
+    container_name: ollama_service
+    ports:
+      - "11434:11434" # Expose Ollama port to the host (optional, for direct access/debugging)
+    volumes:
+      - ollama_data:/root/.ollama # Persist Ollama models
+    networks:
+      - ollama_net
+    # If you have a GPU and want Ollama to use it:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1 # or 'all'
+    #           capabilities: [gpu]
+
+volumes:
+  ollama_data: # Defines the named volume for Ollama data
+
+networks:
+  ollama_net:
+    driver: bridge
