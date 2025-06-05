@@ -17,8 +17,7 @@ This project provides a web interface to summarize text using Ollama and large l
     git clone <your-repository-url>
     cd <repository-folder-name>
     ```
-    If you are running this from your local files directly, navigate to the project directory (`/Users/niteeshreddy/Desktop/Test/`) in your terminal.
-
+    
 2.  **Build and Run with Docker Compose:**
     This command will build the Streamlit application image and start both the application container and the Ollama service container.
     ```bash
@@ -27,34 +26,44 @@ This project provides a web interface to summarize text using Ollama and large l
     *   The `--build` flag ensures the Docker image for the app is built (or rebuilt if changes were made).
     *   The first time you run this, it might take a few minutes to download the `python:3.9-slim` and `ollama/ollama` base images.
 
-3.  **Pull Ollama Models:**
-    The Ollama service container (`ollama_service`) starts without any models. You need to pull the models you want to use.
+3.  **Pull the Required Ollama Model:**
+    The Ollama service container (`ollama_service`) starts without any models. This application uses the `llama3.2:latest` model.
     *   Open a **new terminal window** (while `docker-compose up` is running in the first one).
-    *   Execute the following commands to pull desired models. You can pull them one by one:
+    *   Execute the following command to pull the required model:
         ```bash
         docker exec -it ollama_service ollama pull llama3.2:latest
-        docker exec -it ollama_service ollama pull mistral
-        # Add other models as needed, e.g., phi3, gemma:2b
         ```
-        Or pull multiple models with a single command:
-        ```bash
-        docker exec -it ollama_service sh -c "ollama pull llama3.2:latest && ollama pull llama3 && ollama pull mistral && ollama pull phi3 && ollama pull gemma:2b"
-        ```
-    *   Model pulling can take some time depending on model size and internet speed. These models will be saved in a Docker volume (`ollama_data`) and will persist across container restarts.
+    *   Model pulling can take some time depending on its size and your internet speed. The model will be saved in a Docker volume (`ollama_data`) and will persist across container restarts.
+    *   You can pull other models (e.g., `mistral`, `phi3`) for other purposes if you use Ollama for different tasks, but this specific Streamlit application is configured to use only `llama3.2:latest`.
 
 4.  **Access the Application:**
-    Once the containers are running and models are pulled, open your web browser and go to:
+    Once the containers are running and the `llama3.2:latest` model is pulled, open your web browser and go to:
     [http://localhost:8501](http://localhost:8501)
 
-    You should see the Text Summarizer interface. Select the model you pulled, paste your text, and get your summary.
+    You should see the AI Text Summarizer interface.
 
 ## Usage
 
-*   Enter text directly into the input area or upload a `.txt` file.
-*   Select an available Ollama model from the sidebar. The default list includes `llama3.2:latest`, `llama3`, `mistral`, `phi3`, and `gemma:2b`.
-*   If the model you pulled isn't listed or you want to use a different one you've pulled into the `ollama_service` container, you can type its name into the "**Enter new model name (and press Enter):**" field in the sidebar.
-*   Optionally, provide a custom prompt template in the sidebar. Ensure your custom prompt includes `{text_to_summarize}` where the input text should be inserted.
-*   Click "**Summarize Text**".
+1.  **Input Text:**
+    *   Paste your text directly into the "Paste Text Here" area on the main page.
+    *   Alternatively, upload a `.txt` file using the "📂 Upload .txt File" button.
+    *   You can clear the current input text using the "🗑️ Clear Input" button.
+
+2.  **Custom Prompt (Optional):**
+    *   In the sidebar, expand the "Custom Prompt Instruction (Optional)" section.
+    *   Enter any specific instructions for the summarizer (e.g., "Focus on the main conclusions", "Extract key entities").
+    *   The application will automatically append your input text to this instruction. **Do not** include placeholders like `{text_to_summarize}` in your custom instruction.
+    *   Click "✅ Apply Prompt" to confirm your instruction. A toast message will appear.
+    *   Click "🔄 Reset Instruction" to clear your custom prompt and revert to the default internal prompt.
+
+3.  **Generate Summary:**
+    *   Click the "🚀 Generate Summary" button located in the sidebar.
+    *   The summary will appear in the "Editable Summary Output" area.
+    *   The application attempts to remove markdown formatting (like `**bold**` or `*italic*`) from the generated summary for a cleaner output.
+    *   Word counts for both input and output text are displayed.
+
+4.  **Download Summary:**
+    *   Click the "📋 Download Summary" button below the summary output to save it as a `.txt` file.
 
 ## Stopping the Application
 
@@ -69,3 +78,23 @@ This project provides a web interface to summarize text using Ollama and large l
     ```
 
 ## Project Structure
+
+```
+/Test
+├── .git/                # Git version control files (if initialized)
+├── .gitignore           # Specifies intentionally untracked files that Git should ignore
+├── Dockerfile           # Instructions to build the Streamlit application Docker image
+├── README.md            # This file: project overview, setup, and usage instructions
+├── docker-compose.yml   # Defines and runs multi-container Docker applications (Streamlit app + Ollama service)
+├── requirements.txt     # Python dependencies for the Streamlit application
+├── summarizer_app.py    # Main Streamlit application script (UI and frontend logic)
+├── summarizer_engine.py # Backend logic for text summarization using Ollama
+└── __pycache__/         # Python bytecode cache (auto-generated)
+```
+
+*   **`Dockerfile`**: Defines the environment for the Streamlit application, installing Python, dependencies, and setting up the entry point.
+*   **`docker-compose.yml`**: Orchestrates the deployment of the Streamlit app and the Ollama service. It manages networking, volumes for persistent Ollama model storage (`ollama_data`), and environment variables.
+*   **`requirements.txt`**: Lists Python packages required by `summarizer_app.py` and `summarizer_engine.py` (e.g., `streamlit`, `ollama`).
+*   **`summarizer_app.py`**: Contains all the Streamlit code to create the user interface, handle user inputs, manage session state, and display results.
+*   **`summarizer_engine.py`**: Includes the core function `summarize_text_ollama` that communicates with the Ollama API to perform text summarization.
+                

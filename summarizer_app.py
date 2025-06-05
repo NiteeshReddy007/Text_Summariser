@@ -1,84 +1,186 @@
 import streamlit as st
 from summarizer_engine import summarize_text_ollama
+import re # For word count
 
-st.set_page_config(page_title="Ollama Text Summarizer", layout="wide")
+# --- Page Configuration ---
+st.set_page_config(
+    page_title="Advanced AI Text Summarizer | Ollama",
+    page_icon="✨",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-st.title("📝 Ollama-Powered Text Summarizer")
-st.markdown("Summarize your text using local Ollama models.")
+# --- Constants ---
+DEFAULT_MODEL = "llama3.2:latest"
+INITIAL_CUSTOM_PROMPT = "" # e.g., "Extract key entities from the following text"
 
-# Available Ollama models (user should have these pulled)
-# You can customize this list
-DEFAULT_MODELS = ["llama3.2:latest","llama3", "mistral", "phi3", "gemma:2b"]
+# --- Session State Initialization ---
+def init_session_state():
+    defaults = {
+        'selected_model': DEFAULT_MODEL,
+        'custom_prompt_template': INITIAL_CUSTOM_PROMPT,
+        'generated_summary': "",
+        'input_text': "",
+        'file_uploader_key': 0, # To allow re-uploading the same file
+    }
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
 
-# Initialize session state for model list if it doesn't exist
-if 'available_models' not in st.session_state:
-    st.session_state.available_models = DEFAULT_MODELS
+init_session_state()
 
-with st.sidebar:
-    st.header("⚙️ Configuration")
-    
-    selected_model = st.selectbox(
-        "Choose Ollama Model:",
-        options=st.session_state.available_models,
-        index=0, # Default to the first model in the list
-        help="Ensure the selected model is pulled in Ollama (e.g., `ollama pull llama3`)"
-    )
+# --- Helper Functions ---
+def get_text_stats(text):
+    word_count = len(re.findall(r'\w+', text))
+    return f"Words: {word_count}"
 
-    st.markdown("---_Or add a new model name below_---")
-    new_model_name = st.text_input("Enter new model name (and press Enter):", key="new_model_input")
-    if new_model_name and new_model_name not in st.session_state.available_models:
-        st.session_state.available_models.append(new_model_name)
-        st.experimental_rerun() # Rerun to update the selectbox
-
-    custom_prompt_template = st.text_area(
-        "Custom Prompt Template (Optional):",
-        height=100,
-        placeholder="e.g., 'Provide a very short summary of: {text_to_summarize}'\nLeave empty to use the default prompt.",
-        help="If you use a custom prompt, ensure it includes '{text_to_summarize}' as a placeholder for the input text."
-    )
-
-col1, col2 = st.columns(2)
-
-with col1:
-    st.subheader("📄 Input Text")
-    input_text = st.text_area("Paste your text here:", height=300, key="input_text_area")
-    
-    uploaded_file = st.file_uploader("Or upload a .txt file", type=['txt'])
-    if uploaded_file is not None:
+def handle_file_upload():
+    uploaded_file_obj = st.session_state.get(f"file_uploader_{st.session_state.file_uploader_key}")
+    if uploaded_file_obj is not None:
         try:
-            input_text = uploaded_file.read().decode('utf-8')
-            # Display the uploaded text in the text_area for consistency and potential editing
-            st.text_area("File Content (editable if needed before summarizing):", value=input_text, height=300, key="file_content_display")
+            content = uploaded_file_obj.read().decode('utf-8')
+            st.session_state.input_text = content
+            st.toast(f"Successfully loaded '{uploaded_file_obj.name}'!", icon="📄")
         except Exception as e:
             st.error(f"Error reading file: {e}")
-            input_text = "" # Clear input text on error
+            st.session_state.input_text = ""
+        finally:
+            # Increment key to allow re-uploading the same file after clearing
+            st.session_state.file_uploader_key += 1 
 
-summarize_button = st.button("✨ Summarize Text", use_container_width=True, type="primary")
+# --- Sidebar UI ---
+with st.sidebar:
+    st.image("https://ollama.com/public/ollama.png", width=100, use_column_width=False)
+    st.title("⚙️ Summarizer Controls")
+    st.divider()
+
+    # Custom Prompt directly in sidebar
+    with st.expander("Custom Prompt Instruction (Optional)", expanded=False):
+            st.session_state.custom_prompt_template = st.text_area(
+                "Your Custom Instruction (e.g., 'Extract key entities'):",
+                height=100,
+                value=st.session_state.custom_prompt_template,
+                placeholder="Default internal prompt will be used if empty.",
+                help="Enter your specific instruction. The app will automatically append the input text to it. Do NOT include '{text_to_summarize}'."
+            )
+            
+            apply_col, reset_col = st.columns(2)
+            with apply_col:
+                if st.button("✅ Apply Prompt", key="apply_custom_prompt_btn", help="Confirms the custom instruction.", use_container_width=True):
+                    st.toast("Custom instruction noted and ready!", icon="👍")
+                    # No rerun needed, session state is already updated by text_area
+            with reset_col:
+                if st.button("🔄 Reset Instruction", key="reset_custom_prompt_instr_btn", help="Clears the custom instruction field.", use_container_width=True):
+                    st.session_state.custom_prompt_template = INITIAL_CUSTOM_PROMPT
+                    st.toast("Custom instruction cleared!", icon="🔄")
+                    st.rerun()
+    
+    # Generate Summary button in sidebar
+    summarize_button_sidebar = st.button(
+        "🚀 Generate Summary", 
+        use_container_width=True, 
+        type="primary", 
+        key="summarize_button_sidebar",
+        help="Click to process the text and generate a summary."
+    )
+    st.markdown("<hr style='margin-top: 1em; margin-bottom: 1em;'>", unsafe_allow_html=True)
+    st.caption("© 2024 Cascade AI Solutions") # Branding
+
+# --- Main Application Area ---
+st.title("✨ Advanced AI Text Summarizer")
+st.markdown("Condense large texts into insightful summaries with LLMs.")
+
+# --- Input and Output Columns with Containers ---
+col1, col2 = st.columns(2, gap="large")
+
+with col1:
+    with st.container(border=True):
+        st.header("📜 Input Your Text")
+        st.session_state.input_text = st.text_area(
+            "Paste Text Here (or use file uploader below):",
+            value=st.session_state.input_text,
+            height=250, # Reduced height
+            key="main_input_text_area",
+            help="The text you want to summarize."
+        )
+        # Display char/word count for input text
+        st.caption(get_text_stats(st.session_state.input_text))
+
+        # File uploader and clear button in a row
+        upload_col, clear_col = st.columns([3,2])
+        with upload_col:
+            st.file_uploader(
+                "📂 Upload .txt File",
+                type=['txt'],
+                key=f"file_uploader_{st.session_state.file_uploader_key}", # Dynamic key for re-upload
+                on_change=handle_file_upload,
+                help="Upload a plain text file for summarization."
+            )
+        with clear_col:
+            if st.button("🗑️ Clear Input", use_container_width=True, help="Clears the input text area and uploaded file."):
+                st.session_state.input_text = ""
+                st.session_state.file_uploader_key += 1 # To allow re-uploading the same file
+                st.toast("Input text cleared!", icon="✨")
+                st.rerun()
 
 with col2:
-    st.subheader("💡 Summary")
-    summary_placeholder = st.empty() # Used to display summary or messages
+    with st.container(border=True):
+        st.header("💡 Generated Summary")
+        st.session_state.generated_summary = st.text_area(
+            "Editable Summary Output:",
+            value=st.session_state.generated_summary,
+            height=250, # Reduced height
+            key="summary_edit_text_area",
+            help="The AI-generated summary will appear here. You can edit it as needed."
+        )
+        # Display char/word count for summary text
+        st.caption(get_text_stats(st.session_state.generated_summary))
 
-if summarize_button:
-    # Prioritize edited file content if available, otherwise use the main text area content
-    if uploaded_file and 'file_content_display' in st.session_state:
-        final_input_text = st.session_state.file_content_display
-    else:
-        final_input_text = input_text
+        # Download button for summary
+        st.download_button(
+            label="💾 Download Summary", # Made label slightly more descriptive
+            data=st.session_state.generated_summary,
+            file_name="summary.txt",
+            mime="text/plain",
+            use_container_width=True, # This will make it span the width of its container
+            disabled=not st.session_state.generated_summary,
+            help="Download the summary as a .txt file."
+        )
+
+# --- Summarization Logic ---
+# The button state is checked using its key from the sidebar
+if st.session_state.get('summarize_button_sidebar'):
+    final_input_text = st.session_state.input_text # Simplified, as file upload now updates input_text directly
 
     if not final_input_text.strip():
-        summary_placeholder.warning("Please enter or upload some text to summarize.")
+        st.session_state.generated_summary = ""
+        st.sidebar.warning("⚠️ Please input or upload text to summarize.") # Display warning in sidebar
     else:
-        with st.spinner(f"Summarizing using {selected_model}..."): 
-            prompt_to_use = custom_prompt_template if custom_prompt_template.strip() else None
-            summary = summarize_text_ollama(final_input_text, model_name=selected_model, custom_prompt=prompt_to_use)
-            if summary.startswith("Error:") or summary.startswith("Ollama API Error:") or summary.startswith("An unexpected error occurred:"):
-                summary_placeholder.error(summary)
-            elif summary == "Input text is empty.":
-                 summary_placeholder.warning(summary)
-            else:
-                summary_placeholder.markdown(summary)
-else:
-    summary_placeholder.info("Enter text and click 'Summarize Text' to see the result.")
+        with st.spinner(f"⏳ Summarizing with {DEFAULT_MODEL}..."):
+            user_instruction = st.session_state.custom_prompt_template.strip()
+            final_prompt_for_ollama = None
+            if user_instruction:
+                # Combine user's instruction with the input text
+                # Adding a clear separator like a newline or specific instruction phrasing
+                final_prompt_for_ollama = f"{user_instruction}\n\nText to process:\n{final_input_text}"
+            
+            summary_result = summarize_text_ollama(
+                final_input_text, # Still pass original text for potential non-custom-prompt use in engine or for context
+                model_name=DEFAULT_MODEL, # Use the fixed DEFAULT_MODEL directly
+                custom_prompt=final_prompt_for_ollama # This is now the fully formed prompt or None
+            )
 
-st.markdown("---_Powered by Streamlit & Ollama_---")
+            if summary_result.startswith("Error:") or \
+               summary_result.startswith("Ollama API Error:") or \
+               summary_result.startswith("An unexpected error occurred:"):
+                st.error(f"❌ {summary_result}")
+                st.session_state.generated_summary = "" 
+
+            else:
+                st.session_state.generated_summary = summary_result
+                st.toast("Summary generated successfully!", icon="🎉")
+                st.rerun() # Update summary text_area and counts
+
+# --- Footer ---
+st.divider()
+st.caption("✨ Happy Summarizing! ✨")

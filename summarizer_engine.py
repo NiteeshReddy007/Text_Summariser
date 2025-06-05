@@ -18,7 +18,7 @@ def summarize_text_ollama(text, model_name='llama3', custom_prompt=None):
         text (str): The text to summarize.
         model_name (str): The name of the Ollama model to use (e.g., 'llama3', 'mistral').
         custom_prompt (str, optional): A custom prompt template.
-                                     Must include '{text_to_summarize}' placeholder.
+                                      If provided, this is treated as the full prompt. The app will construct it.
 
     Returns:
         str: The summarized text, or an error message if summarization fails.
@@ -30,7 +30,7 @@ def summarize_text_ollama(text, model_name='llama3', custom_prompt=None):
         return "Input text is empty."
 
     if custom_prompt:
-        prompt = custom_prompt.format(text_to_summarize=text)
+        prompt = custom_prompt
     else:
         prompt = f"""Please provide a concise and comprehensive summary of the following text.
 Highlight the key points and main ideas, while maintaining the original context and meaning.
@@ -53,6 +53,7 @@ Summary:"""
             ]
         )
         summary = response['message']['content']
+        summary = summary.replace('*', '')
         return summary.strip()
     except ollama.ResponseError as e:
         if "model not found" in str(e).lower() or (hasattr(e, 'status_code') and e.status_code == 404):
@@ -65,12 +66,13 @@ Summary:"""
 
 if __name__ == '__main__':
     sample_text = """
-    The James Webb Space Telescope (JWST) is a space telescope designed primarily to conduct infrared astronomy.
-    As the largest optical telescope in space, its high infrared resolution and sensitivity allow it to view objects
-    too old, distant, or faint for the Hubble Space Telescope. This is expected to enable a broad range of
-    investigations across the fields of astronomy and cosmology, such as observation of the first stars and
-    the formation of the first galaxies, and detailed atmospheric characterization of potentially habitable exoplanets.
-    JWST was launched in December 2021 and, as of 2024, is operational.
+    Cricket is a bat-and-ball game played between two teams of eleven players on a field at the centre of which is a 22-yard (20-metre) pitch
+    with a wicket at each end, each comprising two bails balanced on three stumps. The batting side scores runs by striking the ball bowled
+    at the wicket with the bat and running between the wickets, while the bowling and fielding side tries to prevent this (by preventing the
+    ball from leaving the field, and getting the ball to either wicket) and dismiss each batter (so they are "out"). Means of dismissal
+    include being bowled, when the ball hits the stumps and dislodges the bails, and by the fielding side catching the ball after it is hit
+    by the bat, but before it hits the ground. When ten batters have been dismissed, the innings ends and the teams swap roles. The game is
+    adjudicated by two umpires, aided by a third umpire and match referee in international matches.
     """
 
     print(f"Attempting to summarize with Ollama (client configured for: {OLLAMA_API_HOST})...\n")
@@ -78,12 +80,22 @@ if __name__ == '__main__':
     if not client:
         print("Ollama client could not be initialized. Please check Ollama setup and OLLAMA_HOST environment variable.")
     else:
-        summary_default = summarize_text_ollama(sample_text)
-        print(f"Summary (default model 'llama3'):\n{summary_default}\n")
+        # Test with default prompt
+        summary_default = summarize_text_ollama(sample_text, model_name='llama3.2:latest')
+        print(f"Summary (default prompt, model 'llama3.2:latest'):\n{summary_default}\n")
 
-        custom_prompt_template = "Summarize this text in one sentence: {text_to_summarize}"
-        summary_custom_prompt = summarize_text_ollama(sample_text, model_name='llama3', custom_prompt=custom_prompt_template)
-        print(f"Summary (custom prompt, model 'llama3'):\n{summary_custom_prompt}\n")
+        # Test with a custom instruction (simulating how the app would construct the full prompt)
+        user_instruction_example = "Explain the basic objective of cricket in one sentence."
+        # The summarize_text_ollama function expects the combined prompt if custom_prompt is used.
+        full_custom_prompt_for_test = f"{user_instruction_example}\n\nText to summarize:\n{sample_text}"
+
+        summary_custom_prompt = summarize_text_ollama(
+            sample_text, # This 'text' argument is used by the default prompt if custom_prompt is None.
+                                 # If custom_prompt is provided, the actual text being summarized is part of full_custom_prompt_for_test.
+            model_name='llama3.2:latest',
+            custom_prompt=full_custom_prompt_for_test
+        )
+        print(f"Summary (custom instruction, model 'llama3.2:latest'):\n{summary_custom_prompt}\n")
 
         empty_text_summary = summarize_text_ollama("")
         print(f"Summary of empty text: {empty_text_summary}")
