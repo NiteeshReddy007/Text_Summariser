@@ -28,8 +28,8 @@ This project provides a web interface to summarize text using Ollama and large l
 
 3.  **Pull the Required Ollama Model:**
     The Ollama service container (`ollama_service`) starts without any models. This application uses the `llama3.2:latest` model.
-    *   Open a **new terminal window** (while `docker-compose up` is running in the first one).
-    *   Execute the following command to pull the required model:
+    *   After `docker-compose up --build` has successfully started all containers in your first terminal (you should see logs indicating the services are running, particularly the Ollama service), open a **new terminal window**.
+    *   Execute the following command to pull the required model (note: `llama3.2:latest` is approximately 2GB in size, so the download may take some time depending on your internet connection):
         ```bash
         docker exec -it ollama_service ollama pull llama3.2:latest
         ```

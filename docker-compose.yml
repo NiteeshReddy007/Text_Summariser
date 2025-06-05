@@ -24,14 +24,6 @@ services:
       - ollama_data:/root/.ollama # Persist Ollama models
     networks:
       - ollama_net
-    # If you have a GPU and want Ollama to use it:
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1 # or 'all'
-    #           capabilities: [gpu]
 
 volumes:
   ollama_data: # Defines the named volume for Ollama data
