@@ -50,7 +50,9 @@ def handle_file_upload():
 
 # --- Sidebar UI ---
 with st.sidebar:
-    st.image("https://ollama.com/public/ollama.png", width=100, use_column_width=False)
+    # st.image("https://ollama.com/public/ollama.png", width=100, use_column_width=False)
+    st.image("https://ollama.com/public/ollama.png", width=100)
+
     st.title("⚙️ Summarizer Controls")
     st.divider()
 

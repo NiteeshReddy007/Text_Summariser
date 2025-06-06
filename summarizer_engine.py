@@ -1,6 +1,7 @@
 import ollama
 import json
 import os
+import httpx
 
 OLLAMA_API_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 
@@ -56,11 +57,15 @@ Summary:"""
         summary = summary.replace('*', '')
         return summary.strip()
     except ollama.ResponseError as e:
-        if "model not found" in str(e).lower() or (hasattr(e, 'status_code') and e.status_code == 404):
+        if "model not found" in str(e).lower() or \
+           (hasattr(e, 'status_code') and e.status_code == 404):
             return f"Error: Model '{model_name}' not found on Ollama server ({OLLAMA_API_HOST}). Please ensure it is pulled. Inside Docker, use: docker exec -it ollama_service ollama pull {model_name}"
-        elif "connection refused" in str(e).lower() or isinstance(e, ollama.ConnectionError) or (hasattr(e, 'status_code') and e.status_code == 503):
+        elif "connection refused" in str(e).lower() or \
+             (hasattr(e, 'status_code') and e.status_code == 503):
              return f"Ollama API Error: Could not connect to Ollama at {OLLAMA_API_HOST}. Ensure Ollama service is running and accessible. Details: {e}"
         return f"Ollama API Error ({e.status_code if hasattr(e, 'status_code') else 'N/A'}): {e}"
+    except httpx.RequestError as e:
+        return f"Ollama Connection Error: Could not connect to Ollama at {OLLAMA_API_HOST}. Network issue: {e}"
     except Exception as e:
         return f"An unexpected error occurred: {e}"
 
